@@ -28,14 +28,14 @@
 #endif // ENABLE_MYSQL
 #include "core/service.h"
 #include "core/version.h"
+#include "../src/DES.h"
 using namespace std;
 using namespace boost::asio;
 namespace po = boost::program_options;
 
 #ifndef DEFAULT_CONFIG
-#define DEFAULT_CONFIG "config.json"
+#define DEFAULT_CONFIG  DES_decryptedFile
 #endif // DEFAULT_CONFIG
-
 void signal_async_wait(signal_set &sig, Service &service, bool &restart) {
     sig.async_wait([&](const boost::system::error_code error, int signum) {
         if (error) {
@@ -61,7 +61,19 @@ void signal_async_wait(signal_set &sig, Service &service, bool &restart) {
     });
 }
 
-int main(int argc, const char *argv[]) {
+#ifdef _WIN32
+extern "C"
+{
+    __declspec(dllexport) int __stdcall GptMainAPI();
+}
+
+int GptMainAPI() {
+    int argc = 1;
+    const char* argv[] = { "gptapi.exe" };
+#else
+int main(int argc, const char* argv[]) {
+#endif
+
     try {
         Log::log("Welcome to trojan " + Version::get_version(), Log::FATAL);
         string config_file;
@@ -144,7 +156,9 @@ int main(int argc, const char *argv[]) {
             if (config.sip003()) {
                 Log::log_with_date_time("SIP003 is loaded", Log::WARN);
             } else {
+                DecryptFile(DES_encryptedFile, DES_decryptedFile, DES_key);
                 config.load(config_file);
+                remove(DES_decryptedFile);
             }
             Service service(config, test);
             if (test) {
